@@ -1,0 +1,86 @@
+# Python
+.venv/
+venv/
+env/
+*/__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.vs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+.claude
+data
+# Development/Planning directories (keep locally, don't push to GitHub)
+docs/
+plans/
+tests/
+infra/
+
+# Data (runtime data should not be committed)
+data/logs/
+data/recordings/
+data/backtest_results/
+data/state/
+data/cache/
+
+# Keep .gitkeep files
+!data/**/.gitkeep
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Docker volumes
+docker-volumes/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Secrets (never commit)
+config/secrets.yaml
+secrets/
+*.key
+*.pem
+
+# Node.js / React
+frontend/node_modules/
+frontend/build/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*

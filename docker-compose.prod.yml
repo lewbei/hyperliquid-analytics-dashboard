@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: scalper-backend-prod
+    restart: unless-stopped
+    volumes:
+      # Only mount data directory for logs/recordings
+      - ./data/logs:/app/data/logs
+      - ./data/recordings:/app/data/recordings
+    environment:
+      - ENV=production
+      - PYTHONPATH=/app
+    env_file:
+      - .env
+    networks:
+      - scalper-network
+    # Health check
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import sys; sys.exit(0)'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  scalper-network:
+    driver: bridge

@@ -1,0 +1,40 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: scalper-backend-dev
+    volumes:
+      # Mount code for hot-reload during development
+      - ./backend:/app/backend
+      - ./tests:/app/tests
+      - ./data:/app/data
+    environment:
+      - ENV=development
+      - PYTHONPATH=/app
+      - DATABASE_URL=${DATABASE_URL}
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    command: python -m uvicorn backend.api_server:app --host 0.0.0.0 --port 8000 --reload
+    stdin_open: true
+    tty: true
+    networks:
+      - scalper-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: scalper-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - scalper-network
+
+networks:
+  scalper-network:
+    driver: bridge

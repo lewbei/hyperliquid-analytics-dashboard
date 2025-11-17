@@ -1,0 +1,10 @@
+# Development dependencies
+-r requirements.txt
+
+# Testing
+pytest==9.0.1
+
+# Code quality (optional, add as needed)
+# black
+# flake8
+# mypy

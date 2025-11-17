@@ -1,0 +1,18 @@
+# Production dependencies for Hyperliquid Perp Scalper
+
+# Hyperliquid API
+hyperliquid-python-sdk==0.20.1
+requests==2.32.5
+websockets==15.0.1
+
+# Data validation
+pydantic==2.12.4
+
+# Database (PostgreSQL)
+psycopg2-binary==2.9.10
+SQLAlchemy==2.0.36
+alembic==1.14.0
+
+# API Server
+fastapi==0.115.6
+uvicorn[standard]==0.34.0

@@ -1,0 +1,27 @@
+# Development Dockerfile for Hyperliquid Perp Scalper
+# Optimized for hot-reload and development
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install development dependencies
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+# Note: Code is mounted as volume in docker-compose.yml
+# This allows for hot-reload during development
+
+# Default command for dev - run tests or live stream
+CMD ["python", "-m", "backend.run_live"]
