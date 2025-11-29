@@ -1,7 +1,18 @@
 import { useState } from 'react';
 import { useWebSocket } from './useWebSocket';
 
-const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws/analytics';
+
+const getWsUrl = () => {
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL;
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  return `${protocol}//${host}/ws/analytics`;
+};
+
+const WS_BASE_URL = getWsUrl();
+
 
 // All active perpetual symbols from Hyperliquid (non-delisted)
 // Top 3 major assets, then rest alphabetically
@@ -190,38 +201,35 @@ function Dashboard() {
               <h2>Market Context</h2>
               <div className="stat-row">
                 <span>Market Sentiment:</span>
-                <span className={`value highlight ${
-                  data.cross_asset_context.market_sentiment === 'bullish' ? 'positive' :
-                  data.cross_asset_context.market_sentiment === 'bearish' ? 'negative' : ''
-                }`}>
+                <span className={`value highlight ${data.cross_asset_context.market_sentiment === 'bullish' ? 'positive' :
+                    data.cross_asset_context.market_sentiment === 'bearish' ? 'negative' : ''
+                  }`}>
                   {data.cross_asset_context.market_sentiment.toUpperCase()}
                 </span>
               </div>
               {Object.entries(data.cross_asset_context.assets)
                 .filter(([symbol]) => symbol !== selectedCoin) // Exclude the currently selected coin
                 .map(([symbol, assetData]) => (
-                <div key={symbol} style={{ marginTop: '12px' }}>
-                  <h3 style={{ fontSize: '0.95em', marginBottom: '6px', opacity: 0.9 }}>{symbol}</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '0.85em' }}>
-                    <div>Price: <span className="value">{formatUSD(assetData.current_price)}</span></div>
-                    {assetData.volume_24h && (
-                      <div>24h Vol: <span className="value">{formatUSD(assetData.volume_24h)}</span></div>
-                    )}
-                    <div>1m Return: <span className={getValueClass(assetData.return_1m)}>{formatPercent(assetData.return_1m, 3)}</span></div>
-                    <div>5m Return: <span className={getValueClass(assetData.return_5m)}>{formatPercent(assetData.return_5m, 3)}</span></div>
-                    <div>15m Return: <span className={getValueClass(assetData.return_15m)}>{formatPercent(assetData.return_15m, 3)}</span></div>
-                    <div>1h Return: <span className={getValueClass(assetData.return_1h)}>{formatPercent(assetData.return_1h, 3)}</span></div>
-                    <div>Vol Regime: <span className={`value ${
-                      assetData.volatility_regime === 'low' ? '' :
-                      assetData.volatility_regime === 'high' ? 'negative' : ''
-                    }`}>{assetData.volatility_regime.toUpperCase()}</span></div>
-                    <div>Trend: <span className={`value ${
-                      assetData.trend_regime === 'up' ? 'positive' :
-                      assetData.trend_regime === 'down' ? 'negative' : ''
-                    }`}>{assetData.trend_regime.toUpperCase()}</span></div>
+                  <div key={symbol} style={{ marginTop: '12px' }}>
+                    <h3 style={{ fontSize: '0.95em', marginBottom: '6px', opacity: 0.9 }}>{symbol}</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '0.85em' }}>
+                      <div>Price: <span className="value">{formatUSD(assetData.current_price)}</span></div>
+                      {assetData.volume_24h && (
+                        <div>24h Vol: <span className="value">{formatUSD(assetData.volume_24h)}</span></div>
+                      )}
+                      <div>1m Return: <span className={getValueClass(assetData.return_1m)}>{formatPercent(assetData.return_1m, 3)}</span></div>
+                      <div>5m Return: <span className={getValueClass(assetData.return_5m)}>{formatPercent(assetData.return_5m, 3)}</span></div>
+                      <div>15m Return: <span className={getValueClass(assetData.return_15m)}>{formatPercent(assetData.return_15m, 3)}</span></div>
+                      <div>1h Return: <span className={getValueClass(assetData.return_1h)}>{formatPercent(assetData.return_1h, 3)}</span></div>
+                      <div>Vol Regime: <span className={`value ${assetData.volatility_regime === 'low' ? '' :
+                          assetData.volatility_regime === 'high' ? 'negative' : ''
+                        }`}>{assetData.volatility_regime.toUpperCase()}</span></div>
+                      <div>Trend: <span className={`value ${assetData.trend_regime === 'up' ? 'positive' :
+                          assetData.trend_regime === 'down' ? 'negative' : ''
+                        }`}>{assetData.trend_regime.toUpperCase()}</span></div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
 
@@ -673,10 +681,9 @@ function Dashboard() {
               <h3>Trend</h3>
               <div className="stat-row">
                 <span>Direction:</span>
-                <span className={`value ${
-                  data.regime.trend_regime === 'up' ? 'positive' :
-                  data.regime.trend_regime === 'down' ? 'negative' : ''
-                }`}>
+                <span className={`value ${data.regime.trend_regime === 'up' ? 'positive' :
+                    data.regime.trend_regime === 'down' ? 'negative' : ''
+                  }`}>
                   {data.regime.trend_regime.toUpperCase()}
                 </span>
               </div>
@@ -688,10 +695,9 @@ function Dashboard() {
               <h3>Liquidity</h3>
               <div className="stat-row">
                 <span>Regime:</span>
-                <span className={`value ${
-                  data.regime.liquidity_regime === 'high' ? 'positive' :
-                  data.regime.liquidity_regime === 'thin' ? 'negative' : ''
-                }`}>
+                <span className={`value ${data.regime.liquidity_regime === 'high' ? 'positive' :
+                    data.regime.liquidity_regime === 'thin' ? 'negative' : ''
+                  }`}>
                   {data.regime.liquidity_regime.toUpperCase()}
                 </span>
               </div>
