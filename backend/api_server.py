@@ -15,6 +15,8 @@ from typing import Dict, Any
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+import httpx
+
 from backend.config import HyperliquidClientConfig, MAINNET, TESTNET
 from backend.hyperliquid_client import HyperliquidClient
 from backend.transport_hyperliquid_sdk import HyperliquidSdkTransport
@@ -38,8 +40,6 @@ from backend.regime_detector import RegimeDetector
 from backend.slippage_estimator import SlippageEstimator, OrderBookLevel as SlippageOrderBookLevel
 from backend.crowding_detector import CrowdingDetector
 from backend.cross_asset_context import CrossAssetContextTracker
-
-import requests
 
 app = FastAPI(title="Hyperliquid Analytics API")
 
@@ -134,64 +134,119 @@ class AnalyticsEngine:
         self.last_volume_fetch_time = 0
         self.coin = None
 
-    def fetch_hyperliquid_volumes(self, coin: str) -> None:
+        self._volume_update_interval = 60.0
+        self._volume_task: asyncio.Task | None = None
+        self._volume_lock = asyncio.Lock()
+    async def fetch_hyperliquid_volumes(self, coin: str) -> None:
         """Fetch 24h, 4h, and 1h volumes from Hyperliquid API."""
-        import time
         current_time = time.time()
 
-        # Only fetch every 60 seconds to avoid rate limits
-        if current_time - self.last_volume_fetch_time < 60:
+        if current_time - self.last_volume_fetch_time < self._volume_update_interval:
             return
 
+        async with self._volume_lock:
+            if current_time - self.last_volume_fetch_time < self._volume_update_interval:
+                return
+
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    await self._update_meta_volume(client, coin)
+                    self.hyperliquid_1h_volume = await self._fetch_candle_volume(client, coin, 60)
+                    self.hyperliquid_4h_volume = await self._fetch_candle_volume(client, coin, 240)
+
+                self.last_volume_fetch_time = current_time
+                vol_24h = f"${self.hyperliquid_24h_volume:,.0f}" if self.hyperliquid_24h_volume else "N/A"
+                vol_4h = f"${self.hyperliquid_4h_volume:,.0f}" if self.hyperliquid_4h_volume else "N/A"
+                vol_1h = f"${self.hyperliquid_1h_volume:,.0f}" if self.hyperliquid_1h_volume else "N/A"
+                print(f"[INFO] Updated Hyperliquid volumes: 24h={vol_24h}, 4h={vol_4h}, 1h={vol_1h}")
+
+            except Exception as exc:
+                print(f"[ERROR] Failed to fetch Hyperliquid volumes: {exc}")
+
+    async def _update_meta_volume(self, client: httpx.AsyncClient, coin: str) -> None:
+        response = await client.post(
+            "https://api.hyperliquid.xyz/info",
+            json={"type": "metaAndAssetCtxs"},
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        if not (isinstance(data, list) and len(data) == 2):
+            return
+
+        universe = data[0]
+        contexts = data[1]
+
+        coin_index = None
+        for idx, name in enumerate(universe.get("universe", [])):
+            if name.get("name") == coin:
+                coin_index = idx
+                break
+
+        if coin_index is None or coin_index >= len(contexts):
+            return
+
+        context = contexts[coin_index]
+        day_volume = context.get("dayNtlVlm")
+        if day_volume:
+            self.hyperliquid_24h_volume = float(day_volume)
+
+    async def _fetch_candle_volume(self, client: httpx.AsyncClient, coin: str, count: int) -> float | None:
+        end_time_ms = int(time.time() * 1000)
+        start_time_ms = end_time_ms - (count * 60 * 1000)
+
+        request_data = {
+            "type": "candleSnapshot",
+            "req": {
+                "coin": coin,
+                "interval": "1m",
+                "startTime": start_time_ms,
+                "endTime": end_time_ms,
+            },
+        }
+
+        response = await client.post(
+            "https://api.hyperliquid.xyz/info",
+            json=request_data,
+        )
+        response.raise_for_status()
+        candles = response.json()
+
+        if not isinstance(candles, list):
+            return None
+
+        total_volume = 0.0
+        for candle_data in candles:
+            if not isinstance(candle_data, dict):
+                continue
+            try:
+                volume = float(candle_data.get("v", 0.0))
+                close = float(candle_data.get("c", 0.0))
+                total_volume += volume * close
+            except (TypeError, ValueError):
+                continue
+
+        return total_volume if total_volume > 0 else None
+
+    async def start_volume_updater(self, coin: str) -> None:
+        self.coin = coin
+        if self._volume_task and not self._volume_task.done():
+            return
+
+        self._volume_task = asyncio.create_task(self._volume_update_loop())
+
+    def stop_volume_updater(self) -> None:
+        if self._volume_task:
+            self._volume_task.cancel()
+            self._volume_task = None
+
+    async def _volume_update_loop(self) -> None:
         try:
-            # Fetch 24h volume from metaAndAssetCtxs
-            response = requests.post(
-                "https://api.hyperliquid.xyz/info",
-                json={"type": "metaAndAssetCtxs"},
-                timeout=10
-            )
-            response.raise_for_status()
-            data = response.json()
-
-            # Find our coin in the response
-            if isinstance(data, list) and len(data) == 2:
-                universe = data[0]  # Meta
-                contexts = data[1]  # Asset contexts
-
-                # Find coin index
-                coin_index = None
-                for idx, name in enumerate(universe.get("universe", [])):
-                    if name.get("name") == coin:
-                        coin_index = idx
-                        break
-
-                if coin_index is not None and coin_index < len(contexts):
-                    ctx = contexts[coin_index]
-                    day_volume = ctx.get("dayNtlVlm")
-                    if day_volume:
-                        self.hyperliquid_24h_volume = float(day_volume)
-
-            # Fetch 1h and 4h volumes from candles
-            fetcher = HyperliquidCandleFetcher(coin=coin)
-
-            # Get last 1 hour of 1m candles (60 candles)
-            candles_1h = fetcher.fetch_recent_candles("1m", count=60)
-            if candles_1h:
-                self.hyperliquid_1h_volume = sum(c.volume * c.close for c in candles_1h)
-
-            # Get last 4 hours of 1m candles (240 candles)
-            candles_4h = fetcher.fetch_recent_candles("1m", count=240)
-            if candles_4h:
-                self.hyperliquid_4h_volume = sum(c.volume * c.close for c in candles_4h)
-
-            self.last_volume_fetch_time = current_time
-            vol_24h = f"${self.hyperliquid_24h_volume:,.0f}" if self.hyperliquid_24h_volume else "N/A"
-            vol_4h = f"${self.hyperliquid_4h_volume:,.0f}" if self.hyperliquid_4h_volume else "N/A"
-            vol_1h = f"${self.hyperliquid_1h_volume:,.0f}" if self.hyperliquid_1h_volume else "N/A"
-            print(f"[INFO] Updated Hyperliquid volumes: 24h={vol_24h}, 4h={vol_4h}, 1h={vol_1h}")
-
-        except Exception as e:
-            print(f"[ERROR] Failed to fetch Hyperliquid volumes: {e}")
+            while self.coin:
+                await self.fetch_hyperliquid_volumes(self.coin)
+                await asyncio.sleep(self._volume_update_interval)
+        except asyncio.CancelledError:
+            return
 
     def preload_historical_data(self, coin: str) -> None:
         """Preload historical candle data from Hyperliquid REST API.
@@ -238,9 +293,6 @@ class AnalyticsEngine:
                 self.session_tracker.current_price = current_close
 
             print(f"[INFO] Historical data preload complete")
-
-            # Fetch initial volumes
-            self.fetch_hyperliquid_volumes(coin)
 
         except Exception as e:
             print(f"[ERROR] Failed to preload historical data: {e}")
@@ -403,10 +455,6 @@ class AnalyticsEngine:
 
     def get_analytics_data(self) -> Dict[str, Any]:
         """Get current analytics data as JSON."""
-        # Fetch Hyperliquid volumes periodically (rate-limited to once per 60s)
-        if self.coin:
-            self.fetch_hyperliquid_volumes(self.coin)
-
         # Get rate metrics
         rate_stats = self.get_message_rate()
 
@@ -930,6 +978,8 @@ async def start_analytics():
     # Preload historical candle data
     analytics_engine.preload_historical_data(coin)
 
+    await analytics_engine.start_volume_updater(coin)
+
     # Start streaming in background thread
     import threading
 
@@ -1002,6 +1052,8 @@ async def websocket_analytics(websocket: WebSocket, coin: str = "SOL"):
         # Preload historical candle data
         connection_analytics_engine.preload_historical_data(coin)
 
+        await connection_analytics_engine.start_volume_updater(coin)
+
         # Start streaming in background thread
         def _stream_loop():
             try:
@@ -1044,6 +1096,8 @@ async def websocket_analytics(websocket: WebSocket, coin: str = "SOL"):
         # Cleanup
         if 'event_task' in locals():
             event_task.cancel()
+        if connection_analytics_engine:
+            connection_analytics_engine.stop_volume_updater()
         if connection_hyperliquid_client:
             try:
                 connection_hyperliquid_client.close()
