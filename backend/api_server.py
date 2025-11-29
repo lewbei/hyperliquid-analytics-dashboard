@@ -970,29 +970,6 @@ async def startup_event():
     await start_analytics()
 
 
-# Mount static files
-# Check if static directory exists (it should in Docker)
-static_dir = os.path.join(os.getcwd(), "static")
-if os.path.exists(static_dir):
-    app.mount("/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets")
-    
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        # API routes are handled above automatically by FastAPI
-        # If not an API route, serve index.html
-        if full_path.startswith("api") or full_path.startswith("health") or full_path.startswith("ws"):
-             return {"error": "Not found"}
-        return FileResponse(os.path.join(static_dir, "index.html"))
-
-    @app.get("/")
-    async def serve_root():
-        return FileResponse(os.path.join(static_dir, "index.html"))
-else:
-    # Fallback for local dev if not running via Docker/Vite
-    @app.get("/")
-    async def root():
-        return {"message": "Hyperliquid Analytics API is running. Frontend not found (run locally with Vite).", "version": "1.0.0"}
-
 
 @app.get("/api/analytics")
 async def get_analytics():
@@ -1099,6 +1076,30 @@ async def websocket_analytics(websocket: WebSocket, coin: str = "SOL"):
             except:
                 pass
         print(f"[WebSocket] Cleaned up connection for {coin}")
+
+
+# Mount static files
+# Check if static directory exists (it should in Docker)
+static_dir = os.path.join(os.getcwd(), "static")
+if os.path.exists(static_dir):
+    app.mount("/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets")
+    
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # API routes are handled above automatically by FastAPI
+        # If not an API route, serve index.html
+        if full_path.startswith("api") or full_path.startswith("health") or full_path.startswith("ws"):
+             return {"error": "Not found"}
+        return FileResponse(os.path.join(static_dir, "index.html"))
+
+    @app.get("/")
+    async def serve_root():
+        return FileResponse(os.path.join(static_dir, "index.html"))
+else:
+    # Fallback for local dev if not running via Docker/Vite
+    @app.get("/")
+    async def root():
+        return {"message": "Hyperliquid Analytics API is running. Frontend not found (run locally with Vite).", "version": "1.0.0"}
 
 
 if __name__ == "__main__":
