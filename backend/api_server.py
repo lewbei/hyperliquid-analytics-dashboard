@@ -1055,7 +1055,15 @@ async def websocket_analytics(websocket: WebSocket, coin: str = "SOL"):
         # Stream analytics data to client
         while True:
             if connection_analytics_engine is not None:
+                # Get analytics data
                 data = connection_analytics_engine.get_analytics_data()
+                
+                # Inject collector status
+                if data_collector:
+                    if "system_status" not in data:
+                        data["system_status"] = {}
+                    data["system_status"]["collector"] = data_collector.get_status()
+                    
                 await websocket.send_json(data)
 
             await asyncio.sleep(1)  # Send update every second
