@@ -34,7 +34,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./backend/
 
 # Copy frontend build artifacts
-COPY --from=frontend-builder /app/frontend/dist /app/static
+COPY --from=frontend-builder /app/frontend/build /app/static
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && \
