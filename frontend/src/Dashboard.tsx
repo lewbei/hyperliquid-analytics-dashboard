@@ -192,18 +192,18 @@ function Dashboard() {
                   <h3 style={{ marginTop: '12px', marginBottom: '6px', fontSize: '0.9em' }}>Data Collector</h3>
                   <div className="stat-row">
                     <span>Status:</span>
-                    <span className={`value highlight ${data.system_status.collector.stats.running ? 'positive' : 'negative'}`}>
-                      {data.system_status.collector.stats.running ? '▶ RUNNING' : '⏹ STOPPED'}
+                    <span className={`value highlight ${data.system_status.collector.running ? 'positive' : 'negative'}`}>
+                      {data.system_status.collector.running ? '▶ RUNNING' : '⏹ STOPPED'}
                     </span>
                   </div>
                   <div className="stat-row">
                     <span>Collected:</span>
-                    <span className="value">{data.system_status.collector.stats.total_collected}</span>
+                    <span className="value">{data.system_status.collector.total_collected}</span>
                   </div>
-                  {data.system_status.collector.stats.errors > 0 && (
+                  {data.system_status.collector.errors > 0 && (
                     <div className="stat-row">
                       <span>Errors:</span>
-                      <span className="value negative">{data.system_status.collector.stats.errors}</span>
+                      <span className="value negative">{data.system_status.collector.errors}</span>
                     </div>
                   )}
                 </>
