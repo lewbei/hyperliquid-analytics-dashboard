@@ -198,6 +198,19 @@ export interface AnalyticsData {
     };
     last_check?: number;
     error?: string;
+    collector?: {
+      ok: boolean;
+      fresh: boolean;
+      stats: {
+        running: boolean;
+        total_collected: number;
+        last_collection_time: number;
+        interval: number;
+        errors: number;
+        last_error: string | null;
+        last_error_time: number | null;
+      };
+    };
   };
   cross_asset_context?: {
     assets: {

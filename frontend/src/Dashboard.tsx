@@ -187,6 +187,27 @@ function Dashboard() {
                   ))}
                 </>
               )}
+              {data.system_status.collector && (
+                <>
+                  <h3 style={{ marginTop: '12px', marginBottom: '6px', fontSize: '0.9em' }}>Data Collector</h3>
+                  <div className="stat-row">
+                    <span>Status:</span>
+                    <span className={`value highlight ${data.system_status.collector.stats.running ? 'positive' : 'negative'}`}>
+                      {data.system_status.collector.stats.running ? '▶ RUNNING' : '⏹ STOPPED'}
+                    </span>
+                  </div>
+                  <div className="stat-row">
+                    <span>Collected:</span>
+                    <span className="value">{data.system_status.collector.stats.total_collected}</span>
+                  </div>
+                  {data.system_status.collector.stats.errors > 0 && (
+                    <div className="stat-row">
+                      <span>Errors:</span>
+                      <span className="value negative">{data.system_status.collector.stats.errors}</span>
+                    </div>
+                  )}
+                </>
+              )}
               {data.system_status.error && (
                 <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(255,0,0,0.1)', borderRadius: '4px', fontSize: '0.85em' }}>
                   Error: {data.system_status.error}
@@ -202,7 +223,7 @@ function Dashboard() {
               <div className="stat-row">
                 <span>Market Sentiment:</span>
                 <span className={`value highlight ${data.cross_asset_context.market_sentiment === 'bullish' ? 'positive' :
-                    data.cross_asset_context.market_sentiment === 'bearish' ? 'negative' : ''
+                  data.cross_asset_context.market_sentiment === 'bearish' ? 'negative' : ''
                   }`}>
                   {data.cross_asset_context.market_sentiment.toUpperCase()}
                 </span>
@@ -222,10 +243,10 @@ function Dashboard() {
                       <div>15m Return: <span className={getValueClass(assetData.return_15m)}>{formatPercent(assetData.return_15m, 3)}</span></div>
                       <div>1h Return: <span className={getValueClass(assetData.return_1h)}>{formatPercent(assetData.return_1h, 3)}</span></div>
                       <div>Vol Regime: <span className={`value ${assetData.volatility_regime === 'low' ? '' :
-                          assetData.volatility_regime === 'high' ? 'negative' : ''
+                        assetData.volatility_regime === 'high' ? 'negative' : ''
                         }`}>{assetData.volatility_regime.toUpperCase()}</span></div>
                       <div>Trend: <span className={`value ${assetData.trend_regime === 'up' ? 'positive' :
-                          assetData.trend_regime === 'down' ? 'negative' : ''
+                        assetData.trend_regime === 'down' ? 'negative' : ''
                         }`}>{assetData.trend_regime.toUpperCase()}</span></div>
                     </div>
                   </div>
@@ -682,7 +703,7 @@ function Dashboard() {
               <div className="stat-row">
                 <span>Direction:</span>
                 <span className={`value ${data.regime.trend_regime === 'up' ? 'positive' :
-                    data.regime.trend_regime === 'down' ? 'negative' : ''
+                  data.regime.trend_regime === 'down' ? 'negative' : ''
                   }`}>
                   {data.regime.trend_regime.toUpperCase()}
                 </span>
@@ -696,7 +717,7 @@ function Dashboard() {
               <div className="stat-row">
                 <span>Regime:</span>
                 <span className={`value ${data.regime.liquidity_regime === 'high' ? 'positive' :
-                    data.regime.liquidity_regime === 'thin' ? 'negative' : ''
+                  data.regime.liquidity_regime === 'thin' ? 'negative' : ''
                   }`}>
                   {data.regime.liquidity_regime.toUpperCase()}
                 </span>
