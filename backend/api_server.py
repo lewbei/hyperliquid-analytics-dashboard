@@ -11,9 +11,15 @@ import os
 import time
 import threading
 from typing import Dict, Any
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import os
 
 from backend.config import HyperliquidClientConfig, MAINNET, TESTNET
 from backend.hyperliquid_client import HyperliquidClient
@@ -38,6 +44,8 @@ from backend.regime_detector import RegimeDetector
 from backend.slippage_estimator import SlippageEstimator, OrderBookLevel as SlippageOrderBookLevel
 from backend.crowding_detector import CrowdingDetector
 from backend.cross_asset_context import CrossAssetContextTracker
+from backend.database import DatabaseManager
+from backend.collector import DataCollector
 
 import requests
 
@@ -909,6 +917,8 @@ class AnalyticsEngine:
 # Global analytics engine
 analytics_engine: AnalyticsEngine = None
 hyperliquid_client: HyperliquidClient = None
+database_manager: DatabaseManager = None
+data_collector: DataCollector = None
 
 
 async def start_analytics():
@@ -926,6 +936,14 @@ async def start_analytics():
     hyperliquid_client = HyperliquidClient(coin=coin, config=config, transport=transport)
 
     analytics_engine = AnalyticsEngine()
+
+    # Initialize Database and Collector
+    global database_manager, data_collector
+    database_manager = DatabaseManager()
+    await database_manager.connect()
+    
+    data_collector = DataCollector(analytics_engine, database_manager)
+    await data_collector.start()
 
     # Preload historical candle data
     analytics_engine.preload_historical_data(coin)
@@ -959,10 +977,28 @@ async def startup_event():
     await start_analytics()
 
 
-@app.get("/")
-async def root():
-    """Root endpoint."""
-    return {"message": "Hyperliquid Analytics API", "version": "1.0.0"}
+# Mount static files
+# Check if static directory exists (it should in Docker)
+static_dir = os.path.join(os.getcwd(), "static")
+if os.path.exists(static_dir):
+    app.mount("/assets", StaticFiles(directory=os.path.join(static_dir, "assets")), name="assets")
+    
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # API routes are handled above automatically by FastAPI
+        # If not an API route, serve index.html
+        if full_path.startswith("api") or full_path.startswith("health") or full_path.startswith("ws"):
+             return {"error": "Not found"}
+        return FileResponse(os.path.join(static_dir, "index.html"))
+
+    @app.get("/")
+    async def serve_root():
+        return FileResponse(os.path.join(static_dir, "index.html"))
+else:
+    # Fallback for local dev if not running via Docker/Vite
+    @app.get("/")
+    async def root():
+        return {"message": "Hyperliquid Analytics API is running. Frontend not found (run locally with Vite).", "version": "1.0.0"}
 
 
 @app.get("/api/analytics")
@@ -970,7 +1006,27 @@ async def get_analytics():
     """Get current analytics data."""
     if analytics_engine is None:
         return {"error": "Analytics engine not initialized"}
-    return analytics_engine.get_analytics_data()
+    
+    data = analytics_engine.get_analytics_data()
+    
+    # Inject collector status into system_status if available
+    if data_collector and "system_status" in data:
+        collector_status = data_collector.get_status()
+        data["system_status"]["collector"] = {
+            "ok": collector_status["running"] and collector_status["errors"] == 0,
+            "fresh": True, # Assumed fresh if running
+            "stats": collector_status
+        }
+        
+    return data
+
+
+@app.get("/health/collector")
+async def get_collector_health():
+    """Get data collector health status."""
+    if data_collector is None:
+        return {"status": "not_initialized"}
+    return data_collector.get_status()
 
 
 @app.websocket("/ws/analytics")

@@ -16,3 +16,10 @@ alembic==1.14.0
 # API Server
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
+
+# Data Collection & Analytics
+asyncpg==0.29.0
+numpy==1.26.3
+scipy==1.11.4
+python-dotenv==1.0.0
+aiofiles==23.2.1
