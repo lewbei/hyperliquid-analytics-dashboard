@@ -11,6 +11,7 @@ import os
 import time
 import threading
 from typing import Dict, Any
+from collections import deque
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -19,30 +20,29 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-import os
 
 from backend.config import HyperliquidClientConfig, MAINNET, TESTNET
 from backend.hyperliquid_client import HyperliquidClient
 from backend.transport_hyperliquid_sdk import HyperliquidSdkTransport
 
-from backend.orderbook_metrics import (
+from backend.analytics.orderbook_metrics import (
     OrderBook,
     OrderBookSide,
     OrderBookLevel,
     calculate_all_metrics,
 )
-from backend.trade_flow_tracker import Trade, TradeFlowTracker, detect_sweep_direction
-from backend.price_momentum import PriceMomentumTracker
-from backend.market_indicators import ActiveAssetContext, MarketIndicatorsTracker
-from backend.depth_decay import DepthDecayTracker
-from backend.liquidations import LiquidationsDetector
-from backend.candle_aggregator import CandleAggregator, OHLCV
-from backend.volatility import VolatilityTracker
+from backend.analytics.trade_flow_tracker import Trade, TradeFlowTracker, detect_sweep_direction
+from backend.analytics.price_momentum import PriceMomentumTracker
+from backend.analytics.market_indicators import ActiveAssetContext, MarketIndicatorsTracker
+from backend.analytics.depth_decay import DepthDecayTracker
+from backend.analytics.liquidations import LiquidationsDetector
+from backend.analytics.candle_aggregator import CandleAggregator, OHLCV
+from backend.analytics.volatility import VolatilityTracker
 from backend.session_context import SessionContextTracker
-from backend.candle_fetcher import HyperliquidCandleFetcher
-from backend.regime_detector import RegimeDetector
-from backend.slippage_estimator import SlippageEstimator, OrderBookLevel as SlippageOrderBookLevel
-from backend.crowding_detector import CrowdingDetector
+from backend.analytics.candle_fetcher import HyperliquidCandleFetcher
+from backend.analytics.regime_detector import RegimeDetector
+from backend.analytics.slippage_estimator import SlippageEstimator, OrderBookLevel as SlippageOrderBookLevel
+from backend.analytics.crowding_detector import CrowdingDetector
 from backend.cross_asset_context import CrossAssetContextTracker
 from backend.database import DatabaseManager
 from backend.collector import DataCollector
@@ -130,8 +130,6 @@ class AnalyticsEngine:
         self.market_context_updates = 0
 
         # Rate tracking
-        import time
-        from collections import deque
         self.message_timestamps = deque(maxlen=1000)  # Track last 1000 messages
         self.start_time = time.time()
 
@@ -144,7 +142,6 @@ class AnalyticsEngine:
 
     def fetch_hyperliquid_volumes(self, coin: str) -> None:
         """Fetch 24h, 4h, and 1h volumes from Hyperliquid API."""
-        import time
         current_time = time.time()
 
         # Only fetch every 60 seconds to avoid rate limits
@@ -256,7 +253,6 @@ class AnalyticsEngine:
 
     def process_event(self, event) -> None:
         """Process a WebSocket event."""
-        import time
         self.event_count += 1
         self.message_timestamps.append(time.time())
         event_type = type(event).__name__
@@ -276,7 +272,6 @@ class AnalyticsEngine:
 
     def get_message_rate(self) -> Dict[str, Any]:
         """Calculate message rate statistics."""
-        import time
         now = time.time()
 
         # Messages in last minute
@@ -301,7 +296,6 @@ class AnalyticsEngine:
 
     def _process_orderbook(self, event) -> None:
         """Process orderbook event."""
-        import time
         timestamp_ms = float(event.time_ms)
 
         bid_levels = []
@@ -395,7 +389,6 @@ class AnalyticsEngine:
 
     def _process_market_context(self, event) -> None:
         """Process market context event."""
-        import time
         timestamp_ms = time.time() * 1000
 
         context = ActiveAssetContext(
